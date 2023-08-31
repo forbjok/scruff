@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build:
+        - stable
+        - nightly
+        - windows-msvc
+
+        include:
+        - build: stable
+          os: ubuntu-latest
+          toolchain: stable
+
+        - build: nightly
+          os: ubuntu-latest
+          toolchain: nightly
+
+        - build: windows-msvc
+          os: windows-latest
+          toolchain: stable
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.toolchain }}
+        targets: ${{ matrix.target }}
+
+    - name: Run tests
+      run: cargo test ${{ matrix.options }} --verbose
