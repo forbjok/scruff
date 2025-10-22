@@ -26,11 +26,7 @@ impl Cleaner {
                 // relative to the root.
                 let rel_path = path.strip_prefix(root_path).unwrap();
 
-                if self.would_delete(rel_path) {
-                    Some(path)
-                } else {
-                    None
-                }
+                if self.would_delete(rel_path) { Some(path) } else { None }
             })
             .collect();
 
