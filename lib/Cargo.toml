@@ -8,7 +8,7 @@ repository = "https://github.com/forbjok/scruff.git"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.75"
-globset = "0.4.9"
-tracing = "0.1.37"
-walkdir = "2.3.3"
+anyhow = { workspace = true }
+globset = { workspace = true }
+tracing = { workspace = true }
+walkdir = { workspace = true }
