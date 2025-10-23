@@ -1,4 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use tracing::info;
 
@@ -32,6 +36,15 @@ impl Cleaner {
         ui.begin_clean(root_path.to_string_lossy().as_ref());
 
         let path_entries: Vec<_> = walkdir::WalkDir::new(root_path)
+            .sort_by(move |a, b| {
+                if a.file_type() == b.file_type() {
+                    Ordering::Equal
+                } else if a.file_type().is_dir() {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            })
             .into_iter()
             .filter_entry(|entry| !self.ignore.is_match(entry.path()))
             .filter_map(|entry| entry.ok())
@@ -59,18 +72,17 @@ impl Cleaner {
 
         #[derive(Debug, Default)]
         struct DirState {
-            depth: usize,
-            path: PathBuf,
+            rel_path: PathBuf,
             should_delete: bool,
         }
 
         let mut current_dirstate: DirState = Default::default();
-        let mut prev_dirstates: Vec<DirState> = Default::default();
-        let mut prev_path_depth = root_path.components().count();
+        let mut dirstates: HashMap<PathBuf, DirState> = Default::default();
 
         for path_entry in path_entries {
             let path = path_entry.path();
 
+            let rel_path = path.strip_prefix(root_path)?;
             let mut should_delete: Option<bool> = None;
 
             for (_, rs) in rule_sets.iter().rev() {
@@ -88,12 +100,20 @@ impl Cleaner {
             if path.is_dir() {
                 let path_depth = path.components().count();
 
-                let prev_dirstate = current_dirstate;
+                // Store await previous dirstate
+                dirstates.insert(current_dirstate.rel_path.clone(), current_dirstate);
+
+                // Create new current dirstate
                 current_dirstate = DirState {
-                    depth: path_depth,
-                    path: path.to_path_buf(),
+                    rel_path: rel_path.to_path_buf(),
                     should_delete: false,
                 };
+
+                if let Some(rel_parent_path) = rel_path.parent()
+                    && let Some(parent_dirstate) = dirstates.get(rel_parent_path)
+                {
+                    current_dirstate.should_delete = should_delete.unwrap_or(parent_dirstate.should_delete);
+                }
 
                 // Remove rule sets that are not relevant to the new path depth
                 rule_sets.retain(|(rs_depth, _)| *rs_depth < path_depth);
@@ -103,15 +123,6 @@ impl Cleaner {
                     let rule_set = RuleSet::load_from_file(&rules_file_path, ui)?;
                     rule_sets.push((path_depth, rule_set));
                 }
-
-                if path_depth > prev_path_depth {
-                    current_dirstate.should_delete = should_delete.unwrap_or(prev_dirstate.should_delete);
-                    prev_dirstates.push(prev_dirstate);
-                } else if path_depth <= prev_path_depth && prev_dirstate.should_delete {
-                    dbg!("TRY DELETE DIR", &prev_dirstate.path);
-                }
-
-                prev_path_depth = path_depth;
 
                 continue;
             }
