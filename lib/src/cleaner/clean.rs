@@ -76,8 +76,10 @@ impl Cleaner {
                     rule_sets.push((path_depth, rule_set));
                 }
 
-                if path_depth <= prev_path_depth {
+                if path_depth > prev_path_depth {
 
+                } else if path_depth <= prev_path_depth && deleted_file_count {
+                    let prev_deleted_file_count
                 }
 
                 prev_path_depth = path_depth;
@@ -110,6 +112,8 @@ impl Cleaner {
             if !dry_run {
                 //std::fs::remove_file(path)?;
             }
+
+            deleted_file_count += 1;
         }
 
         info!("Clean complete");
