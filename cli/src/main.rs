@@ -21,8 +21,6 @@ struct Opt {
 enum Command {
     #[clap(about = "Clean a directory")]
     Clean {
-        #[clap(help = "Path to rules file")]
-        rules_path: PathBuf,
         #[clap(help = "Path to clean")]
         path: PathBuf,
         #[clap(
@@ -44,11 +42,7 @@ fn main() -> Result<(), anyhow::Error> {
     let mut ui = CliUiHandler;
 
     match opt.command {
-        Command::Clean {
-            rules_path,
-            path,
-            dry_run,
-        } => command::clean(&rules_path, &path, dry_run, &mut ui)?,
+        Command::Clean { path, dry_run } => command::clean(&path, dry_run, &mut ui)?,
     };
 
     Ok(())
