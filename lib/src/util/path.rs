@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::env;
-use std::path::{Component, MAIN_SEPARATOR, Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
@@ -26,8 +26,4 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
     }
 
     new_path
-}
-
-pub fn unixify_path<P: AsRef<Path>>(path: P) -> String {
-    path.as_ref().to_str().unwrap().replace(MAIN_SEPARATOR, "/")
 }
