@@ -57,15 +57,43 @@ impl Cleaner {
             rule_sets
         };
 
+        #[derive(Debug, Default)]
+        struct DirState {
+            depth: usize,
+            path: PathBuf,
+            should_delete: bool,
+        }
+
+        let mut current_dirstate: DirState = Default::default();
+        let mut prev_dirstates: Vec<DirState> = Default::default();
         let mut prev_path_depth = root_path.components().count();
-        let mut deleted_file_count: usize = 0;
-        let mut deleted_file_count_per_directory: Vec<(PathBuf, usize)> = Default::default();
 
         for path_entry in path_entries {
             let path = path_entry.path();
 
+            let mut should_delete: Option<bool> = None;
+
+            for (_, rs) in rule_sets.iter().rev() {
+                let rel_path = path.strip_prefix(&rs.base_path)?;
+
+                let Some(op) = rs.operation(rel_path) else {
+                    continue;
+                };
+
+                dbg!(op, rel_path, path, &rs.base_path);
+                should_delete = Some(op == Operation::Delete);
+                break;
+            }
+
             if path.is_dir() {
                 let path_depth = path.components().count();
+
+                let prev_dirstate = current_dirstate;
+                current_dirstate = DirState {
+                    depth: path_depth,
+                    path: path.to_path_buf(),
+                    should_delete: false,
+                };
 
                 // Remove rule sets that are not relevant to the new path depth
                 rule_sets.retain(|(rs_depth, _)| *rs_depth < path_depth);
@@ -77,30 +105,18 @@ impl Cleaner {
                 }
 
                 if path_depth > prev_path_depth {
-
-                } else if path_depth <= prev_path_depth && deleted_file_count {
-                    let prev_deleted_file_count
+                    current_dirstate.should_delete = should_delete.unwrap_or(prev_dirstate.should_delete);
+                    prev_dirstates.push(prev_dirstate);
+                } else if path_depth <= prev_path_depth && prev_dirstate.should_delete {
+                    dbg!("TRY DELETE DIR", &prev_dirstate.path);
                 }
 
                 prev_path_depth = path_depth;
-                deleted_file_count_per_directory.push((path.to_path_buf(), deleted_file_count));
-                deleted_file_count = 0;
 
                 continue;
             }
 
-            let mut should_delete = false;
-
-            for (_, rs) in rule_sets.iter().rev() {
-                let rel_path = path.strip_prefix(&rs.base_path)?;
-
-                let Some(op) = rs.operation(rel_path) else {
-                    continue;
-                };
-
-                should_delete = op == Operation::Delete;
-                break;
-            }
+            let should_delete = should_delete.unwrap_or(current_dirstate.should_delete);
 
             if !should_delete {
                 continue;
@@ -112,8 +128,6 @@ impl Cleaner {
             if !dry_run {
                 //std::fs::remove_file(path)?;
             }
-
-            deleted_file_count += 1;
         }
 
         info!("Clean complete");
