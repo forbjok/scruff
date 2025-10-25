@@ -38,8 +38,8 @@ impl RuleSet {
             let pattern = pattern.trim();
 
             let operation = match op {
-                "+" => Operation::Keep,
-                "-" => Operation::Delete,
+                "-" => Operation::Keep,
+                "+" => Operation::Delete,
                 _ => {
                     return Err(anyhow::anyhow!("Invalid rule: {line}"));
                 }
