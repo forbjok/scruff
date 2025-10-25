@@ -1,31 +1,9 @@
-mod builder;
 mod clean;
-mod load;
-mod match_file;
 
-pub use self::builder::*;
-pub use self::clean::*;
-pub use self::load::*;
-
-#[derive(Debug)]
-pub enum Operation {
-    Delete,
-    Keep,
-}
-
-#[derive(Debug)]
-pub struct Rule {
-    pub operation: Operation,
-    pub pattern: String,
-}
+use crate::ruleset::RuleSet;
 
 #[derive(Debug)]
 pub struct Cleaner {
-    rules: Vec<BakedRule>,
-}
-
-#[derive(Debug)]
-struct BakedRule {
-    pub operation: Operation,
-    pub matcher: globset::GlobMatcher,
+    pub ignore: globset::GlobSet,
+    pub global_rule_sets: Vec<RuleSet>,
 }

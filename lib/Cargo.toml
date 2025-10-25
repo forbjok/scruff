@@ -11,4 +11,3 @@ repository = "https://github.com/forbjok/scruff.git"
 anyhow = { workspace = true }
 globset = { workspace = true }
 tracing = { workspace = true }
-walkdir = { workspace = true }

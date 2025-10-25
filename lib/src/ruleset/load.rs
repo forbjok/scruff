@@ -4,20 +4,22 @@ use std::{
     path::Path,
 };
 
+use anyhow::Context;
 use tracing::info;
 
 use crate::ui::UiHandler;
 
-use super::{Cleaner, CleanerBuilder, Operation, Rule};
+use super::{Operation, Rule, RuleSet, builder::RuleSetBuilder};
 
-impl Cleaner {
-    pub fn load_from_file(path: &Path, ui: &mut dyn UiHandler) -> Result<Self, anyhow::Error> {
-        let filename = path.file_name().unwrap().to_string_lossy();
+impl RuleSet {
+    pub fn load_from_file(path: &Path, ui: &mut dyn UiHandler) -> anyhow::Result<Self> {
+        let dir_path = path.parent().context("Get parent directory of ruleset")?;
+        let filename = path.file_name().context("Get filename of ruleset")?.to_string_lossy();
 
         info!("Load ruleset: {}", path.display());
         ui.begin_load(&filename);
 
-        let mut builder = CleanerBuilder::default();
+        let mut builder = RuleSetBuilder::new(dir_path.to_path_buf());
 
         let file = fs::File::open(path)?;
         let file = BufReader::new(file);
