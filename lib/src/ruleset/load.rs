@@ -26,6 +26,13 @@ impl RuleSet {
 
         let lines = file.lines().map_while(Result::ok);
         for line in lines {
+            let line = line.trim_end();
+
+            // Skip blank lines
+            if line.is_empty() {
+                continue;
+            }
+
             // Skip comments
             if line.starts_with('#') {
                 continue;
