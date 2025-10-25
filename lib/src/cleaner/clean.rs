@@ -29,25 +29,37 @@ impl Cleaner {
     }
 
     pub fn clean(&self, root_path: &Path, dry_run: bool, ui: &mut dyn UiHandler) -> Result<(), anyhow::Error> {
+        let root_path = util::normalize_path(root_path);
+
         info!("Clean directory: {}", root_path.display());
 
         ui.begin_clean(root_path.to_string_lossy().as_ref());
 
+        let mut rule_sets: Vec<RuleSet> = self.global_rule_sets.to_vec();
+
+        let mut search_path = Some(root_path.as_path());
+        let mut search_paths: Vec<&Path> = Vec::with_capacity(root_path.components().count());
+
+        while let Some(path) = search_path {
+            search_paths.push(path);
+            search_path = path.parent();
+        }
+
+        search_paths.reverse();
+
+        let mut init_should_delete: Option<bool> = None;
+
         // Load rulesets outside root path
-        let mut rule_sets = {
-            let mut rule_sets: Vec<RuleSet> = self.global_rule_sets.to_vec();
-
-            let mut search_path = root_path.to_path_buf();
-
-            while let Some((dir_path, config_file_path)) = util::locate_config_file(&search_path, RULES_FILENAME)? {
-                rule_sets.push(RuleSet::load_from_file(&config_file_path, ui)?);
-
-                search_path = dir_path;
-                search_path.pop();
+        for path in search_paths {
+            let rules_file_path = path.join(RULES_FILENAME);
+            if rules_file_path.exists() {
+                rule_sets.push(RuleSet::load_from_file(&rules_file_path, ui)?);
             }
 
-            rule_sets
-        };
+            init_should_delete = should_delete(path, &rule_sets)?.or(init_should_delete);
+        }
+
+        let init_should_delete = init_should_delete.unwrap_or(false);
 
         #[derive(Debug, Default)]
         struct DirState {
@@ -64,8 +76,6 @@ impl Cleaner {
         for event in traverser.into_iter() {
             match event? {
                 DirTraverserEvent::EnterDir(path) => {
-                    let ignored = self.ignore.is_match(&path);
-
                     let prev_should_delete = if let Some(prev_dirstate) = current_dirstate.take() {
                         let prev_should_delete = prev_dirstate.should_delete;
 
@@ -74,14 +84,10 @@ impl Cleaner {
 
                         prev_should_delete
                     } else {
-                        false
+                        init_should_delete
                     };
 
-                    let should_delete = if ignored {
-                        false
-                    } else {
-                        should_delete(&path, &rule_sets)?.unwrap_or(prev_should_delete)
-                    };
+                    let should_delete = should_delete(&path, &rule_sets)?.unwrap_or(prev_should_delete);
 
                     let rules_file_path = path.join(RULES_FILENAME);
                     let has_ruleset = if rules_file_path.is_file() {
@@ -107,8 +113,7 @@ impl Cleaner {
                         }
 
                         if current_dirstate.should_delete {
-                            let rel_path = path.strip_prefix(root_path)?;
-                            ui.delete_dir(rel_path.to_string_lossy().as_ref());
+                            ui.delete_dir(path.to_string_lossy().as_ref());
 
                             if !dry_run
                                 && util::is_dir_empty(&path)?
@@ -133,13 +138,11 @@ impl Cleaner {
                     }
 
                     let should_delete = should_delete(&path, &rule_sets)?.unwrap_or(current_dirstate.should_delete);
-
                     if !should_delete {
                         continue;
                     }
 
-                    let rel_path = path.strip_prefix(root_path)?;
-                    ui.delete_file(rel_path.to_string_lossy().as_ref());
+                    ui.delete_file(path.to_string_lossy().as_ref());
 
                     if !dry_run && let Err(err) = std::fs::remove_file(path) {
                         error!("Error deleting file: {err}");
