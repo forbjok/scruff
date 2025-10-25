@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     RULES_FILENAME,
@@ -110,8 +110,11 @@ impl Cleaner {
                             let rel_path = path.strip_prefix(root_path)?;
                             ui.delete_dir(rel_path.to_string_lossy().as_ref());
 
-                            if !dry_run {
-                                //std::fs::remove_dir(path)?;
+                            if !dry_run
+                                && util::is_dir_empty(&path)?
+                                && let Err(err) = std::fs::remove_dir(path)
+                            {
+                                error!("Error deleting directory: {err}");
                             }
                         }
                     }
@@ -138,8 +141,8 @@ impl Cleaner {
                     let rel_path = path.strip_prefix(root_path)?;
                     ui.delete_file(rel_path.to_string_lossy().as_ref());
 
-                    if !dry_run {
-                        //std::fs::remove_file(path)?;
+                    if !dry_run && let Err(err) = std::fs::remove_file(path) {
+                        error!("Error deleting file: {err}");
                     }
                 }
             }

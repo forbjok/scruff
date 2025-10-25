@@ -11,10 +11,10 @@ impl UiHandler for CliUiHandler {
     fn end_clean(&mut self) {}
 
     fn delete_dir(&mut self, path: &str) {
-        eprintln!("RMDIR {path}");
+        println!("D {path}");
     }
 
     fn delete_file(&mut self, path: &str) {
-        eprintln!("D {path}");
+        println!("F {path}");
     }
 }
